@@ -1,28 +1,83 @@
 import supertest from "supertest";
 
 import app from "./../src/app";
+import prisma from "../src/database";
 
 const api = supertest(app);
 
-beforeAll( () => {
-  console.log("Iniciando os testes")
-  // await prisma.event.deleteMany();
+beforeEach(async () => {
+  await prisma.user.deleteMany();
 });
 
-afterAll( () => {
-  console.log("Terminando os testes")
+describe("POST /users tests", () => {
+  it("should create a user", async () => {
+    const user = {
+      email: "teste@t.com",
+      password: "123456"
+    }
+
+    const response = await api.post("/users").send(user);
+
+    expect(response.status).toBe(201);
+  });
+
+  it("should receive 409 when trying to create two users with same e-mail", async () => {
+    const user = {
+      email: "teste@t.com",
+      password: "123456"
+    }
+
+    await prisma.user.create({ data: user });
+
+    const response = await api.post("/users").send(user);
+
+    expect(response.status).toBe(409);
+  });
+
 });
 
-describe("API test", () => {
-  it("should return 200", async () => {
-    const res = await api.get("/event");
+describe("GET /users tests", () => {
+  it("should return a single user", async () => {
+    const userData = {
+      email: "teste@t.com",
+      password: "123456"
+    }
 
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      id: expect.any(Number),
-      title: expect.any(String),
-      image: expect.any(String),
-      date: expect.any(String)
-    })
-  })
+    const user = await prisma.user.create({ data: userData });
+
+    const response = await api.get(`/users/${user.id}`);
+
+    expect(response.body).toEqual(user);
+  });
+
+  it("should return 404 when can't find a user by id", async () => {
+    const { status } = await api.get(`/users/1`);
+
+    expect(status).toBe(404);
+  });
+
+  it("should return all users", async () => {
+    const userData1 = {
+      email: "teste@t.com",
+      password: "123456"
+    }
+
+    const userData2 = {
+      email: "teste2@t.com",
+      password: "123456"
+    }
+
+    const user1 = await prisma.user.create({ data: userData1 });
+    const user2 = await prisma.user.create({ data: userData2 });
+
+    const response = await api.get(`/users`);
+
+    expect(response.body).toEqual(
+      expect.arrayContaining(
+        [expect.objectContaining({
+          email: expect.any(String)
+        })]
+      )
+    );
+  });
 });
